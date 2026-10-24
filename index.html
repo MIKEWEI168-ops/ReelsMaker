@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d9488">
+<title>短片工房 ReelMaker</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;background:#f4f6f6;color:#1f2937}
+header{background:#0d9488;color:#fff;padding:18px 16px 14px}
+header h1{margin:0;font-size:22px}
+header p{margin:6px 0 0;font-size:13px;opacity:.9}
+main{padding:14px 12px 40px;max-width:640px;margin:0 auto}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h2{margin:0 0 10px;font-size:16px}
+.muted{color:#6b7280;font-size:13px}
+.small{font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:9px 14px;font-size:15px;cursor:pointer}
+.btn-primary{background:#0d9488;color:#fff;border-color:#0d9488}
+.btn:disabled{opacity:.5}
+input[type=text],select{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:16px}
+input[type=file]{width:100%}
+label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
+#thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.thumb{position:relative;border-radius:8px;overflow:hidden;background:#eee}
+.thumb img{width:100%;height:120px;object-fit:cover;display:block}
+.thumb .num{position:absolute;left:4px;top:4px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:2px 6px;border-radius:10px}
+.thumb .ctl{position:absolute;right:4px;bottom:4px;display:flex;gap:4px}
+.thumb .ctl button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:6px;width:26px;height:26px;font-size:14px;cursor:pointer}
+#modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:50}
+#modal-back.open{display:flex}
+#modal{background:#fff;width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;display:none;z-index:99}
+</style>
+</head>
+<body>
+<header>
+<h1>🎬 短片工房</h1>
+<p>照片 → 直式 9:16 短片，全程不裁切、不縮放，只淡入淡出</p>
+</header>
+<main>
+<div class="card">
+<h2>1️⃣ 照片</h2>
+<p class="muted">一次選多張，順序就是播放順序。選完還能用 ↑ ↓ 調順序、✕ 刪除。</p>
+<input type="file" id="pick" accept="image/*" multiple>
+<div id="thumbs"></div>
+<div class="muted small" id="photo-count" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+<h2>2️⃣ 標題</h2>
+<label for="title">主標題（出現在第一張照片和結尾字卡）</label>
+<input type="text" id="title" placeholder="例如：小豆島・寒霞渓">
+<label for="handle">結尾署名</label>
+<input type="text" id="handle" value="@backpacking_mike">
+</div>
+
+<div class="card">
+<h2>3️⃣ 音樂（可不選）</h2>
+<p class="muted">選一首手機裡的 MP3，會自動循環、結尾淡出。不選就是無聲短片。</p>
+<input type="file" id="music" accept="audio/*">
+<div class="muted small" id="music-name" style="margin-top:8px">尚未選音樂（短片將無聲）</div>
+</div>
+
+<div class="card">
+<h2>4️⃣ 生成</h2>
+<label for="sec">每張照片停留</label>
+<select id="sec">
+<option value="2">2 秒</option>
+<option value="2.8" selected>2.8 秒</option>
+<option value="4">4 秒</option>
+</select>
+<p class="muted small">生成是即時的：幾秒的片就要跑幾秒，請保持這個畫面開啟。成品 1080×1920，MP4 優先（裝置不支援時為 WebM，IG 不收 WebM，可傳給 Ziggy 轉檔）。</p>
+<div class="row" style="margin-top:10px">
+<button class="btn btn-primary" id="go" style="flex:1">🎬 生成短片</button>
+<button class="btn" id="clear">清空全部</button>
+</div>
+</div>
+
+<p class="muted small" style="text-align:center">短片工房 v1・照片只在你的手機裡處理，不會上傳到任何地方</p>
+</main>
+
+<div id="modal-back"><div id="modal"></div></div>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const W=1080,H=1920,XF=0.5,END=2.2;
+let photos=[]; // {file,url}
+let musicFile=null,musicName='';
+let busy=false,cancel=false;
+
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600);}
+function openModal(html){$('#modal').innerHTML=html;$('#modal-back').classList.add('open');}
+function closeModal(){$('#modal-back').classList.remove('open');}
+$('#modal-back').addEventListener('click',e=>{if(e.target.id==='modal-back')closeModal();});
+
+function renderThumbs(){
+  const box=$('#thumbs');box.innerHTML='';
+  photos.forEach((p,i)=>{
+    const d=document.createElement('div');d.className='thumb';
+    d.innerHTML='<span class="num">'+(i+1)+'</span><img src="'+p.url+'"><span class="ctl">'
+      +'<button data-a="up" title="往前">↑</button>'
+      +'<button data-a="down" title="往後">↓</button>'
+      +'<button data-a="del" title="刪除">✕</button></span>';
+    d.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const a=b.dataset.a;
+      if(a==='del'){URL.revokeObjectURL(p.url);photos.splice(i,1);}
+      if(a==='up'&&i>0){[photos[i-1],photos[i]]=[photos[i],photos[i-1]];}
+      if(a==='down'&&i<photos.length-1){[photos[i+1],photos[i]]=[photos[i],photos[i+1]];}
+      renderThumbs();
+    });
+    box.appendChild(d);
+  });
+  $('#photo-count').textContent=photos.length?('已選 '+photos.length+' 張照片'):''; 
+}
+$('#pick').addEventListener('change',e=>{
+  for(const f of e.target.files){if(!f.type.startsWith('image/'))continue;photos.push({file:f,url:URL.createObjectURL(f)});}
+  e.target.value='';renderThumbs();
+});
+$('#music').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;musicFile=f;musicName=f.name;
+  $('#music-name').textContent='已選音樂：'+musicName;
+});
+$('#clear').onclick=()=>{
+  photos.forEach(p=>URL.revokeObjectURL(p.url));photos=[];musicFile=null;musicName='';
+  $('#music-name').textContent='尚未選音樂（短片將無聲）';renderThumbs();
+};
+
+function loadImg(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const im=new Image();im.onload=()=>res({im:im,u:u});im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('照片讀取失敗'));};im.src=u;});}
+function drawFit(ctx,im){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);const s=Math.min(W/im.width,H/im.height);const w=im.width*s,h=im.height*s;ctx.drawImage(im,(W-w)/2,(H-h)/2,w,h);}
+function fitFont(ctx,text,maxW,weight,px){let p=px;ctx.font=weight+' '+p+'px system-ui,sans-serif';while(p>28&&ctx.measureText(text).width>maxW){p-=6;ctx.font=weight+' '+p+'px system-ui,sans-serif';}return p;}
+
+$('#go').onclick=async()=>{
+  if(busy)return;
+  if(!photos.length){toast('請先選照片');return;}
+  if(!('MediaRecorder' in window)||!document.createElement('canvas').captureStream){toast('這台裝置的瀏覽器不支援生成短片');return;}
+  const title=$('#title').value.trim()||'我的短片';
+  const handle=$('#handle').value.trim()||'';
+  const DUR=parseFloat($('#sec').value)||2.8;
+  busy=true;cancel=false;
+  const total=Math.round(photos.length*DUR+END);
+  openModal('<h3 style="margin-top:0">🎬 生成短片中…</h3><div class="muted small">共 '+photos.length+' 張照片，約需 '+total+' 秒。請保持這個畫面開啟，不要切換 App。</div><div style="background:#e5e7eb;border-radius:6px;height:14px;margin-top:12px;overflow:hidden"><div id="bar" style="background:#0d9488;height:100%;width:0%"></div></div><div class="muted small" id="pct" style="margin-top:6px">0%</div><div class="row" style="margin-top:10px"><button class="btn" id="cancel">取消生成</button></div>');
+  $('#cancel').onclick=()=>{cancel=true;};
+  let wake=null;try{wake=await navigator.wakeLock.request('screen');}catch(_){}
+  let actx=null,asrc=null,gain=null;
+  try{
+    const imgs=[];
+    for(const p of photos){try{imgs.push(await loadImg(p.file));}catch(_){}}
+    if(!imgs.length)throw new Error('照片讀取失敗');
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const ctx=canvas.getContext('2d');
+    const vstream=canvas.captureStream(30);
+    if(musicFile){
+      try{
+        actx=new (window.AudioContext||window.webkitAudioContext)();
+        const buf=await actx.decodeAudioData(await musicFile.arrayBuffer());
+        const dest=actx.createMediaStreamDestination();
+        asrc=actx.createBufferSource();asrc.buffer=buf;asrc.loop=true;
+        gain=actx.createGain();gain.gain.value=0.9;
+        asrc.connect(gain);gain.connect(dest);
+        dest.stream.getAudioTracks().forEach(tr=>vstream.addTrack(tr));
+      }catch(_){actx=null;asrc=null;gain=null;}
+    }
+    const mime=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>{try{return MediaRecorder.isTypeSupported(m);}catch(_){return false;}})||'';
+    const rec=new MediaRecorder(vstream,mime?{mimeType:mime,videoBitsPerSecond:8000000}:{videoBitsPerSecond:8000000});
+    const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    const stopped=new Promise(r=>{rec.onstop=r;});
+    const totalS=imgs.length*DUR+END;
+    function drawTitle(){ctx.save();ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=12;ctx.shadowOffsetY=3;ctx.fillStyle='#fff';fitFont(ctx,title,W-120,'700',92);ctx.fillText(title,W/2,330);ctx.restore();}
+    function drawFrame(el){
+      if(el<imgs.length*DUR){
+        const i=Math.min(imgs.length-1,Math.floor(el/DUR));const lt=el-i*DUR;
+        drawFit(ctx,imgs[i].im);
+        if(lt>DUR-XF&&i+1<imgs.length){ctx.save();ctx.globalAlpha=(lt-(DUR-XF))/XF;drawFit(ctx,imgs[i+1].im);ctx.restore();}
+        if(i===0)drawTitle();
+      }else{
+        ctx.fillStyle='#0b3d3a';ctx.fillRect(0,0,W,H);
+        ctx.save();ctx.textAlign='center';ctx.fillStyle='#fff';fitFont(ctx,title,W-120,'700',76);ctx.fillText(title,W/2,H/2-30);
+        if(handle){ctx.fillStyle='#9fd8d2';ctx.font='400 52px system-ui,sans-serif';ctx.fillText(handle,W/2,H/2+55);}
+        ctx.restore();
+      }
+    }
+    drawFrame(0);
+    rec.start(250);
+    if(actx&&asrc){try{await actx.resume();asrc.start();}catch(_){}}
+    const t0=performance.now();
+    await new Promise(done=>{(function tick(){
+      if(cancel){done();return;}
+      const el=(performance.now()-t0)/1000;
+      drawFrame(Math.min(el,totalS));
+      const pct=Math.min(100,Math.round(el/totalS*100));const bar=$('#bar'),pc=$('#pct');if(bar)bar.style.width=pct+'%';if(pc)pc.textContent=pct+'%';
+      if(gain){const remain=totalS-el;gain.gain.value=remain<2?Math.max(0,remain/2)*0.9:0.9;}
+      if(el>=totalS){done();return;}
+      requestAnimationFrame(tick);})();});
+    try{rec.stop();}catch(_){}
+    if(asrc){try{asrc.stop();}catch(_){}}
+    if(actx){try{actx.close();}catch(_){}}
+    await stopped;
+    imgs.forEach(o=>URL.revokeObjectURL(o.u));
+    if(cancel){closeModal();toast('已取消生成');return;}
+    const type=rec.mimeType||mime||'video/webm';
+    const blob=new Blob(chunks,{type:type});
+    const ext=type.indexOf('mp4')>=0?'mp4':'webm';
+    const url=URL.createObjectURL(blob);
+    const fname=title.replace(/[^\w\u4e00-\u9fa5-]+/g,'_')+'_短片.'+ext;
+    openModal('<h3 style="margin-top:0">🎬 短片完成</h3>'
+      +'<video src="'+url+'" controls playsinline style="width:100%;border-radius:10px;background:#000"></video>'
+      +'<div class="muted small" style="margin:8px 0">'+imgs.length+' 張照片・'+Math.round(totalS)+' 秒・'+(blob.size/1048576).toFixed(1)+' MB・'+(ext==='mp4'?'MP4（可直接發 IG）':'WebM（IG 不收，可傳給 Ziggy 轉檔）')+(musicFile?'・已配樂':'・無音樂')+'</div>'
+      +'<div class="row"><button class="btn" id="m-close">關閉</button><button class="btn" id="m-dl">⬇ 下載</button><button class="btn btn-primary" id="m-share">分享</button></div>');
+    $('#m-close').onclick=()=>{closeModal();URL.revokeObjectURL(url);};
+    $('#m-dl').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();};
+    const shb=$('#m-share');const vfile=new File([blob],fname,{type:type});
+    if(navigator.canShare&&navigator.canShare({files:[vfile]})){shb.onclick=async()=>{try{await navigator.share({files:[vfile]});}catch(_){}};}
+    else shb.style.display='none';
+  }catch(e){
+    if(actx){try{actx.close();}catch(_){}}
+    closeModal();toast('生成失敗：'+((e&&e.message)||'未知錯誤'));
+  }finally{
+    busy=false;if(wake){try{wake.release();}catch(_){}}
+  }
+};
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
+</script>
+</body>
+</html>
