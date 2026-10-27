@@ -23,6 +23,7 @@ main{padding:14px 12px 40px;max-width:640px;margin:0 auto}
 .btn-primary{background:#0d9488;color:#fff;border-color:#0d9488}
 .btn:disabled{opacity:.5}
 input[type=text],select{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:16px}
+textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit}
 input[type=file]{width:100%}
 input[type=range]{width:100%}
 label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
@@ -102,12 +103,22 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 </div>
 
 <div class="card">
+<h2>✍️ 文案</h2>
+<p class="muted">把短文貼在這裡，發 IG 時按「複製文案」再貼上。文案會記住，下次打開還在。</p>
+<textarea id="caption" rows="5" placeholder="貼上短文，例如：倉敷，美得剛剛好……"></textarea>
+<div class="row" style="margin-top:10px">
+<button class="btn btn-primary" id="copy-caption">📋 複製文案</button>
+<button class="btn" id="clear-caption">清除</button>
+</div>
+</div>
+
+<div class="card">
 <h2>📼 我的影片</h2>
 <p class="muted">生成完按「保留在 App 裡」，影片就存在手機裡，隨時可再下載或分享。最多保留 5 支，超過會先刪最舊的。</p>
 <div id="videos"></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<p class="muted small" style="text-align:center">短片工房 v3.1・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
 
 <div id="modal-back"><div id="modal"></div></div>
@@ -423,6 +434,21 @@ async function importShared(){
   if(n){await clearInbox();renderThumbs();toast('已加入分享的 '+n+' 項媒體');}
   if(history.replaceState)history.replaceState(null,'',location.pathname+location.hash);
 }
+
+/* ---- 文案欄位（記住＋一鍵複製） ---- */
+try{const c=localStorage.getItem('rm_caption');if(c)$('#caption').value=c;}catch(_){}
+$('#caption').addEventListener('input',()=>{try{localStorage.setItem('rm_caption',$('#caption').value);}catch(_){}});
+$('#copy-caption').addEventListener('click',async()=>{
+  const t=$('#caption').value;
+  if(!t){toast('文案是空的');return;}
+  try{await navigator.clipboard.writeText(t);toast('文案已複製，去 IG 貼上就行');}
+  catch(_){
+    const el=$('#caption');el.focus();el.select();
+    try{document.execCommand('copy');toast('文案已複製，去 IG 貼上就行');}
+    catch(__){toast('複製失敗，請手動長按選取複製');}
+  }
+});
+$('#clear-caption').addEventListener('click',()=>{$('#caption').value='';try{localStorage.removeItem('rm_caption');}catch(_){}});
 
 loadSettings();
 (async()=>{await restoreMusic();const had=await restoreDraft();if(had)toast('已恢復上次的草稿');await importShared();renderVideos();})();
