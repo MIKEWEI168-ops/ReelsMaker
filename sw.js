@@ -1,5 +1,5 @@
 /* ReelMaker service worker — 快取 App 本體，離線也能開 */
-const CACHE = 'reelmaker-v3';
+const CACHE = 'reelmaker-v3-1';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './maskable-512.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
