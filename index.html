@@ -118,7 +118,7 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <div id="videos"></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3.1・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<p class="muted small" style="text-align:center">短片工房 v3.2・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
 
 <div id="modal-back"><div id="modal"></div></div>
@@ -261,8 +261,8 @@ async function renderVideos(){
     item.querySelector('[data-a=dl]').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();};
     const shb=item.querySelector('[data-a=sh]');
     const vfile=new File([v.blob],fname,{type:v.type||'video/mp4'});
-    if(navigator.canShare&&navigator.canShare({files:[vfile]})){shb.onclick=async()=>{try{await navigator.share({files:[vfile]});}catch(_){}};}
-    else shb.style.display='none';
+    if(navigator.canShare&&navigator.canShare({files:[vfile]})){shb.onclick=async()=>{try{await navigator.share({files:[vfile]});}catch(_){toast('分享失敗，檔案可能太大，請用下載鈕存到手機，再從相簿或 IG 分享');}};}
+    else{shb.onclick=()=>toast('這支影片無法直接分享，請用下載鈕存到手機，再從相簿或 IG 分享');}
     item.querySelector('[data-a=del]').onclick=async()=>{try{const d=await db();if(d){await new Promise((res,rej)=>{const t=d.transaction('videos','readwrite');const r=t.objectStore('videos').delete(v.id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}}catch(_){}renderVideos();};
     box.appendChild(item);
   });
@@ -407,8 +407,8 @@ $('#go').onclick=async()=>{
     $('#m-close').onclick=()=>{closeModal();URL.revokeObjectURL(url);};
     $('#m-dl').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();};
     const shb=$('#m-share');const vfile=new File([blob],fname,{type:type});
-    if(navigator.canShare&&navigator.canShare({files:[vfile]})){shb.onclick=async()=>{try{await navigator.share({files:[vfile]});}catch(_){}};}
-    else shb.style.display='none';
+    if(navigator.canShare&&navigator.canShare({files:[vfile]})){shb.onclick=async()=>{try{await navigator.share({files:[vfile]});}catch(_){toast('分享失敗，檔案可能太大，請用下載鈕存到手機，再從相簿或 IG 分享');}};}
+    else{shb.onclick=()=>toast('這支影片無法直接分享，請用下載鈕存到手機，再從相簿或 IG 分享');}
     $('#m-keep').onclick=async()=>{try{await saveVideo({title:title,handle:handle,dur:Math.round(totalS),size:blob.size,type:type,blob:blob,at:Date.now()});toast('已保留在 App 裡');renderVideos();}catch(e){toast('保留失敗，可能是空間不足');}};
   }catch(e){
     if(actx){try{actx.close();}catch(_){}}
