@@ -65,6 +65,7 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 #org-fly{position:fixed;inset:0;pointer-events:none;z-index:80}
 #org-confirm{display:none;background:#fff7e6;border:1px solid #f2c14e;border-radius:12px;padding:12px;margin-top:10px}
 #org-confirm.open{display:block}
+.org-bybtn.on{background:#0d9488;color:#fff;border-color:#0d9488}
 @media (max-width:720px){.org-cols{grid-template-columns:106px 1fr 106px;gap:6px}.org-card{font-size:11.5px;padding:6px 7px}.org-stage{height:330px}.org-thumb{width:50px}.org-thumb img,.org-thumb video,.org-thumb .tile{width:42px;height:42px}}
 </style>
 </head>
@@ -74,6 +75,7 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <p>照片／影片 → 直式 9:16 短片，全程不裁切、不縮放，只淡入淡出</p>
 </header>
 <main>
+<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="open-org2" style="flex:1;padding:12px">🗂️ 照片分類器（分類＋日期相冊）</button></div>
 <div class="card">
 <h2>1️⃣ 照片／影片</h2>
 <p class="muted">一次選多張，順序就是播放順序。照片按秒數播放，影片以原長度完整放入。長按照片可拖曳換位，也能用 ↑ ↓ 微調、✕ 刪除；每張下面可填地點小字、改停留秒數（影片不用改）。</p>
@@ -144,11 +146,11 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 
 <div class="card">
 <h2>🗂️ 照片分類器</h2>
-<p class="muted">把一個資料夾的照片、影片自動分類：照片依畫面分成截圖、夜景、黃金時刻、天空海洋、人像、日常；影片依長度分短片、B-roll、長片；內容完全一樣的會抓出重複檔案。在電腦 Chrome 開啟時可以真的把檔案移動／複製到分類資料夾（絕不刪除、絕不覆寫，隨時可復原）；手機上先玩示範和分類動畫。</p>
+<p class="muted">把一個資料夾的照片、影片自動分類：照片依畫面分成截圖、夜景、黃金時刻、天空海洋、人像、日常；影片依長度分短片、B-roll、長片；內容完全一樣的會抓出重複檔案。也可以切換「依日期」，把檔案按拍攝日期分成一天一個小相冊。在電腦 Chrome 開啟時可以真的把檔案移動／複製到分類資料夾（絕不刪除、絕不覆寫，隨時可復原）；手機上先玩示範和分類動畫。</p>
 <div class="row" style="margin-top:10px"><button class="btn btn-primary" id="open-org" style="flex:1">🗂️ 開啟照片分類器</button></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3.3・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<p class="muted small" style="text-align:center">短片工房 v3.4・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
 
 <div id="org-view">
@@ -168,12 +170,13 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <button class="btn" id="org-sort" disabled>🌀 分類</button>
 <span class="muted small">（電腦可按空白鍵開始分類）</span>
 </div>
+<div class="row" style="margin-top:8px"><span class="small" style="font-weight:700">分類方式：</span><button class="btn org-bybtn on" id="org-by-cat">🏷️ 依分類</button><button class="btn org-bybtn" id="org-by-date">📅 依日期（小相冊）</button></div>
 <input type="file" id="org-file" multiple accept="image/*,video/*,*/*" style="display:none">
 <p class="muted small" id="org-status" style="min-height:18px">先選一個資料夾，或按「示範」看看效果。</p>
 <div class="org-cols">
-<div><div class="org-col-h">📷 照片</div><div id="org-cards-photo"></div></div>
+<div><div class="org-col-h" id="org-colh-left">📷 照片</div><div id="org-cards-photo"></div></div>
 <div class="org-stage" id="org-stage"><div id="org-tilt"><div id="org-pile"></div></div></div>
-<div><div class="org-col-h">🎬 影片與清理</div><div id="org-cards-video"></div></div>
+<div><div class="org-col-h" id="org-colh-right">🎬 影片與清理</div><div id="org-cards-video"></div></div>
 </div>
 <div id="org-confirm">
 <b id="org-confirm-text">要整理 0 個檔案嗎？</b>
@@ -529,17 +532,42 @@ const ORG_CATS=[
  {id:'dup',name:'重複檔案',group:'video'},
  {id:'other',name:'文件與其他檔案',group:'video'}];
 const orgCat=id=>ORG_CATS.find(c=>c.id===id);
-function orgFolderName(id){return orgCat(id).name;}
+function orgFolderName(id){if(id&&id.indexOf('date-')===0)return id.slice(5);return orgCat(id).name;}
 function orgVideoCat(sec){if(sec==null||isNaN(sec))return 'broll';if(sec<10)return 'vshort';if(sec<60)return 'broll';return 'vlong';}
 function orgIsScreenshotName(name){return /screenshot|截圖|螢幕/i.test(name||'');}
 function orgPhotoCat(f){if(f.screenshot)return 'screenshot';if(f.brightness<0.30)return 'night';if(f.warm>0.36&&f.brightness>=0.30)return 'golden';if(f.blue>0.33)return 'sky';if(f.skin>0.16)return 'portrait';return 'daily';}
 function orgKindOf(name,type){if((type&&type.indexOf('video')===0)||/\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(name||''))return 'video';if((type&&type.indexOf('image')===0)||/\.(jpe?g|png|gif|webp|heic|bmp|avif)$/i.test(name||''))return 'photo';return 'other';}
 function orgSpiral(i,n,cx,cy,R){const a=i*2.399963;const r=n<=1?0:R*0.92*Math.sqrt(i/Math.max(1,n-1));return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),rot:((i*47)%17)-8};}
 function orgSuffixName(name,k){const d=name.lastIndexOf('.');if(d<=0)return name+' ('+k+')';return name.slice(0,d)+' ('+k+')'+name.slice(d);}
+function orgFmtDate(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
+async function orgExifDate(file){try{const buf=await file.slice(0,262144).arrayBuffer();const v=new DataView(buf);if(buf.byteLength<4||v.getUint16(0)!==0xFFD8)return null;let off=2;
+ while(off+4<buf.byteLength){const marker=v.getUint16(off);if(marker===0xFFDA)break;const len=v.getUint16(off+2);
+  if(marker===0xFFE1&&v.getUint32(off+4)===0x45786966){const tiff=off+10;const le=v.getUint16(tiff)===0x4949;const g16=o=>v.getUint16(o,le),g32=o=>v.getUint32(o,le);
+   const ifd0=tiff+g32(tiff+4);
+   const findTag=(ifd,tag)=>{const n=g16(ifd);for(let i=0;i<n;i++){const e=ifd+2+i*12;if(g16(e)===tag)return e;}return -1;};
+   const asciiVal=e=>{const cnt=g32(e+4);const o=cnt<=4?e+8:tiff+g32(e+8);let s='';for(let i=0;i<Math.min(cnt,19);i++){const c=v.getUint8(o+i);if(!c)break;s+=String.fromCharCode(c);}const m=s.match(/(\d{4}):(\d{2}):(\d{2})/);return m?m[1]+'-'+m[2]+'-'+m[3]:null;};
+   let e=findTag(ifd0,0x0132);if(e>0){const d=asciiVal(e);if(d)return d;}
+   e=findTag(ifd0,0x8769);if(e>0){const sub=tiff+g32(e+8);const e2=findTag(sub,0x9003);if(e2>0){const d=asciiVal(e2);if(d)return d;}}
+   return null;}
+  off+=2+len;}
+ return null;}catch(_){return null;}}
+async function orgDateKey(it){if(it.kind==='photo'&&it.file&&/\.jpe?g$/i.test(it.name)){const d=await orgExifDate(it.file);if(d)return d;}
+ const lm=it.file?it.file.lastModified:0;if(lm)return orgFmtDate(new Date(lm));return '日期未知';}
+let orgBy='cat';
 let orgItems=[],orgDirHandle=null,orgMode=null,orgUndoLog=[],orgFlying=false,orgRot=0,orgRafOn=false,orgArrived={};
 const orgStatus=t=>{$('#org-status').textContent=t;};
 function orgSetStats(){$('#org-st-total').textContent=orgItems.length;$('#org-st-photo').textContent=orgItems.filter(i=>i.kind==='photo').length;$('#org-st-video').textContent=orgItems.filter(i=>i.kind==='video').length;$('#org-st-dup').textContent=orgItems.filter(i=>i.cat==='dup').length;}
-function orgRenderCards(){$('#org-cards-photo').innerHTML=ORG_CATS.filter(c=>c.group==='photo').map(orgCardHTML).join('');$('#org-cards-video').innerHTML=ORG_CATS.filter(c=>c.group==='video').map(orgCardHTML).join('');}
+function orgRenderCards(){const L=$('#org-cards-photo'),R=$('#org-cards-video');
+ if(orgBy==='date'){$('#org-colh-left').textContent='📅 日期相冊';$('#org-colh-right').textContent='📅 日期相冊';
+  const groups={};orgItems.forEach(it=>{const k=it.dateKey||'日期未知';groups[k]=(groups[k]||0)+1;});
+  const keys=Object.keys(groups).sort((a,b)=>a==='日期未知'?1:b==='日期未知'?-1:b.localeCompare(a));
+  const half=Math.ceil(keys.length/2);
+  const mk=k=>'<div class="org-card" id="org-card-date-'+k+'">📅 '+esc(k)+'<div class="muted" style="font-size:11px">小相冊・共 '+groups[k]+' 個</div><span class="cnt" id="org-cnt-date-'+k+'">0</span></div>';
+  L.innerHTML=keys.slice(0,half).map(mk).join('')||'<div class="muted small">尚無檔案</div>';R.innerHTML=keys.slice(half).map(mk).join('');return;}
+ $('#org-colh-left').textContent='📷 照片';$('#org-colh-right').textContent='🎬 影片與清理';
+ L.innerHTML=ORG_CATS.filter(c=>c.group==='photo').map(orgCardHTML).join('');R.innerHTML=ORG_CATS.filter(c=>c.group==='video').map(orgCardHTML).join('');}
+function orgItemKey(it){return orgBy==='date'?('date-'+(it.dateKey||'日期未知')):it.cat;}
+function orgSetBy(m){if(orgBy===m||orgFlying)return;orgBy=m;document.querySelectorAll('.org-bybtn').forEach(b=>b.classList.remove('on'));$('#org-by-'+m).classList.add('on');orgRenderCards();if(orgItems.length){orgItems.forEach(it=>it.landed=false);orgRenderPile();}orgStatus(m==='date'?'依日期分類：每一天是一個小相冊（照片優先讀 EXIF 拍攝日期，否則用檔案日期）。':'依分類：內容類別分組。');}
 function orgCardHTML(c){return '<div class="org-card" id="org-card-'+c.id+'">'+esc(c.name)+(c.sub?'<div class="muted" style="font-size:11px">'+esc(c.sub)+'</div>':'')+'<span class="cnt" id="org-cnt-'+c.id+'">0</span></div>';}
 function orgBump(cat){orgArrived[cat]=(orgArrived[cat]||0)+1;const el=$('#org-cnt-'+cat);if(el)el.textContent=orgArrived[cat];const card=$('#org-card-'+cat);if(card){card.classList.remove('pop');void card.offsetWidth;card.classList.add('pop');}}
 
@@ -558,12 +586,13 @@ async function orgAnalyze(){const seen={};let i=0;
   if(it.hash)seen[it.hash]=1;
   if(it.kind==='photo'&&it.file){it.cat=orgPhotoCat(await orgImageFeatures(it));}
   else if(it.kind==='video'){let dur=it.presetDuration;if(dur==null&&it.file){try{dur=await probeVideoDur(it.file);}catch(_){}}it.dur=dur;it.cat=orgVideoCat(dur);}
-  else{it.cat='other';}}
- orgSetStats();orgRenderPile();$('#org-sort').disabled=false;$('#org-replay').disabled=false;
+  else{it.cat='other';}
+  it.dateKey=await orgDateKey(it);}
+ orgSetStats();orgRenderCards();orgRenderPile();$('#org-sort').disabled=false;$('#org-replay').disabled=false;
  orgStatus('分析完成：共 '+orgItems.length+' 個檔案。按「分類」（或空白鍵）看它們飛進分類卡片。');}
 
 function orgThumbInner(it){if(it.kind==='photo'&&it.file)return '<img src="'+URL.createObjectURL(it.file)+'" alt="">';if(it.kind==='video'&&it.file&&it.presetDuration!=null)return '<img src="'+URL.createObjectURL(it.file)+'" alt="">';if(it.kind==='video'&&it.file)return '<video src="'+URL.createObjectURL(it.file)+'" muted playsinline preload="metadata"></video>';return '<div class="tile">'+(it.kind==='video'?'🎬':'📄')+'</div>';}
-function orgRenderPile(){const pile=$('#org-pile');pile.innerHTML='';orgArrived={};ORG_CATS.forEach(c=>{const e=$('#org-cnt-'+c.id);if(e)e.textContent='0';});
+function orgRenderPile(){const pile=$('#org-pile');pile.innerHTML='';$('#org-fly').innerHTML='';orgArrived={};document.querySelectorAll('[id^="org-cnt-"]').forEach(e=>e.textContent='0');
  const stage=$('#org-stage');const W=stage.clientWidth,H=stage.clientHeight;const R=Math.min(W,H)/2-46;
  orgItems.forEach((it,i)=>{const p=orgSpiral(i,orgItems.length,W/2,H/2,Math.max(60,R));it.home=p;
   const d=document.createElement('div');d.className='org-thumb';d.id='org-thumb-'+it.id;
@@ -576,11 +605,11 @@ function orgSort(){if(orgFlying||!orgItems.length)return;orgFlying=true;$('#org-
  orgItems.forEach(it=>{const el=it.el;if(!el)return;const r=el.getBoundingClientRect();it.fx={x:r.left,y:r.top,w:r.width,h:r.height,rot:it.home?it.home.rot:0};
   el.style.position='fixed';el.style.left=r.left+'px';el.style.top=r.top+'px';el.style.margin='0';el.style.zIndex=90;$('#org-fly').appendChild(el);});
  const n=orgItems.length;const T=Math.max(3000,Math.min(6800,2400+n*170));const FLY=680;const t0=performance.now();
- const targets=orgItems.map(it=>{const card=$('#org-card-'+it.cat);const r=card?card.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0};return {x:r.left+r.width/2,y:r.top+r.height/2};});
+ const targets=orgItems.map(it=>{const card=$('#org-card-'+orgItemKey(it));const r=card?card.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0};return {x:r.left+r.width/2,y:r.top+r.height/2};});
  function frame(now){const el=now-t0;let doneAll=true;
   orgItems.forEach((it,i)=>{const elx=it.el;if(!elx||it.landed)return;const start=T>FLY?(T-FLY)*Math.pow(i/Math.max(1,n),1.6):0;const lt=(el-start)/FLY;
    if(lt<0){doneAll=false;return;}
-   if(lt>=1){it.landed=true;elx.style.display='none';orgBump(it.cat);return;}
+   if(lt>=1){it.landed=true;elx.style.display='none';orgBump(orgItemKey(it));return;}
    doneAll=false;const e=lt<.5?2*lt*lt:1-Math.pow(-2*lt+2,2)/2;
    const s={x:it.fx.x+it.fx.w/2,y:it.fx.y+it.fx.h/2};const tg=targets[i];const ctrl={x:(s.x+tg.x)/2,y:Math.min(s.y,tg.y)-130};
    const p=orgBezier(s,ctrl,tg,e);const sc=1-0.72*e;
@@ -623,20 +652,21 @@ async function orgDemo(){orgDirHandle=null;orgMode='demo';$('#org-folder-name').
  const made=await Promise.all(P);
  skyBlob=made[2].blob;
  made.push({name:'IMG_2043-副本.jpg',blob:skyBlob,kind:'photo',dur:null});
+ const LMS={0:new Date(2026,10,5,12).getTime(),1:new Date(2026,10,5,12).getTime(),2:new Date(2026,9,18,12).getTime(),3:new Date(2026,9,18,12).getTime(),4:new Date(2026,9,18,12).getTime(),5:new Date(2026,10,7,12).getTime(),6:new Date(2026,10,7,12).getTime(),7:new Date(2026,8,30,12).getTime(),8:new Date(2026,9,18,12).getTime(),9:new Date(2026,10,5,12).getTime(),10:new Date(2026,8,30,12).getTime(),11:new Date(2026,10,7,12).getTime(),12:new Date(2026,9,18,12).getTime()};
  const order=[0,1,2,3,4,5,6,7,12,8,9,10,11];
- for(const ix of order){const d=made[ix];const f=new File([d.blob],d.name,{type:d.kind==='photo'?'image/jpeg':d.kind==='video'?'video/mp4':'application/pdf'});
+ for(const ix of order){const d=made[ix];const f=new File([d.blob],d.name,{type:d.kind==='photo'?'image/jpeg':d.kind==='video'?'video/mp4':'application/pdf',lastModified:LMS[ix]||Date.now()});
   orgItems.push({id:'o'+orgItems.length+'_'+Math.random().toString(36).slice(2,6),name:d.name,handle:null,file:f,kind:d.kind,presetDuration:d.dur||null});}
  await orgAnalyze();}
 
 async function orgWriteFile(dir,name,data){const fh=await dir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(data);await w.close();}
 async function orgUniqueName(dir,name){let cand=name,k=2;while(true){try{await dir.getFileHandle(cand);cand=orgSuffixName(name,k++);}catch(_){return cand;}}}
 async function orgOrganize(action){if(!orgDirHandle)return;$('#org-confirm').classList.remove('open');let okN=0,failN=0;orgStatus('整理中…');
- for(const it of orgItems){try{const sub=await orgDirHandle.getDirectoryHandle(orgFolderName(it.cat),{create:true});
+ for(const it of orgItems){try{const folder=orgFolderName(orgItemKey(it));const sub=await orgDirHandle.getDirectoryHandle(folder,{create:true});
    const finalName=await orgUniqueName(sub,it.name);
    const src=it.handle?await it.handle.getFile():it.file;if(!src)throw new Error('no source');
    await orgWriteFile(sub,finalName,await src.arrayBuffer());
    if(action==='move'&&it.handle){await orgDirHandle.removeEntry(it.name);}
-   orgUndoLog.push({action,name:it.name,folder:orgFolderName(it.cat),finalName});okN++;
+   orgUndoLog.push({action,name:it.name,folder,finalName});okN++;
   }catch(_){failN++;}orgStatus('整理中… 成功 '+okN+(failN?'，失敗 '+failN:''));}
  orgStatus('整理完成：成功 '+okN+' 個'+(failN?'，失敗 '+failN+' 個':'')+'。');orgRefreshUndo();toast('整理完成 '+okN+' 個檔案');}
 async function orgUndoAll(){if(!orgDirHandle||!orgUndoLog.length)return;let n=0;
@@ -649,6 +679,9 @@ function orgRefreshUndo(){$('#org-undo').disabled=!orgUndoLog.length;}
 function orgOpen(){$('#org-view').classList.add('open');orgRenderCards();orgSetStats();if(!orgRafOn){orgRafOn=true;requestAnimationFrame(orgSpin);}if(orgItems.length)setTimeout(orgRenderPile,60);}
 function orgClose(){$('#org-view').classList.remove('open');orgRafOn=false;}
 $('#open-org').addEventListener('click',orgOpen);
+$('#open-org2').addEventListener('click',orgOpen);
+$('#org-by-cat').addEventListener('click',()=>orgSetBy('cat'));
+$('#org-by-date').addEventListener('click',()=>orgSetBy('date'));
 $('#org-back').addEventListener('click',orgClose);
 $('#org-pick').addEventListener('click',orgPick);
 $('#org-demo').addEventListener('click',()=>{orgDemo().catch(e=>orgStatus('示範失敗：'+e.message));});
