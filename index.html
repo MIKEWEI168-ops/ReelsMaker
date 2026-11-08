@@ -42,6 +42,30 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 #modal-back.open{display:flex}
 #modal{background:#fff;width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;display:none;z-index:99}
+/* ---- 照片分類器 ---- */
+#org-view{position:fixed;inset:0;background:#f4f6f6;z-index:60;display:none;overflow-y:auto}
+#org-view.open{display:block}
+.org-inner{max-width:1020px;margin:0 auto;padding:12px}
+.org-folder-name{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;color:#0f766e}
+.org-stats{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin:6px 0 10px}
+.org-stats b{font-size:17px}
+.org-cols{display:grid;grid-template-columns:208px 1fr 208px;gap:10px;align-items:start}
+.org-col-h{font-size:13px;font-weight:700;color:#4b5563;margin:2px 0 6px}
+.org-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:13.5px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.org-card .cnt{float:right;background:#0d9488;color:#fff;border-radius:10px;padding:0 8px;font-size:12px;font-weight:700}
+.org-card.pop{animation:orgpop .32s ease}
+@keyframes orgpop{40%{transform:scale(1.07);border-color:#0d9488}}
+.org-stage{position:relative;height:440px;background:linear-gradient(#e8f4f1,#fbfdfa);border:1.5px dashed #b6c9c4;border-radius:12px;overflow:hidden}
+#org-tilt{position:absolute;inset:0;transform:rotate(-3deg)}
+#org-pile{position:absolute;inset:0;will-change:transform}
+.org-thumb{position:absolute;width:64px;background:#fff;padding:4px 4px 5px;border-radius:3px;box-shadow:0 3px 10px rgba(0,0,0,.28);z-index:3}
+.org-thumb img,.org-thumb video{width:56px;height:56px;object-fit:cover;display:block;background:#111}
+.org-thumb .tile{width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-size:25px;background:#eef2f2}
+.org-thumb .cap{font-size:9px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;text-align:center}
+#org-fly{position:fixed;inset:0;pointer-events:none;z-index:80}
+#org-confirm{display:none;background:#fff7e6;border:1px solid #f2c14e;border-radius:12px;padding:12px;margin-top:10px}
+#org-confirm.open{display:block}
+@media (max-width:720px){.org-cols{grid-template-columns:106px 1fr 106px;gap:6px}.org-card{font-size:11.5px;padding:6px 7px}.org-stage{height:330px}.org-thumb{width:50px}.org-thumb img,.org-thumb video,.org-thumb .tile{width:42px;height:42px}}
 </style>
 </head>
 <body>
@@ -118,8 +142,47 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <div id="videos"></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3.2・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<div class="card">
+<h2>🗂️ 照片分類器</h2>
+<p class="muted">把一個資料夾的照片、影片自動分類：照片依畫面分成截圖、夜景、黃金時刻、天空海洋、人像、日常；影片依長度分短片、B-roll、長片；內容完全一樣的會抓出重複檔案。在電腦 Chrome 開啟時可以真的把檔案移動／複製到分類資料夾（絕不刪除、絕不覆寫，隨時可復原）；手機上先玩示範和分類動畫。</p>
+<div class="row" style="margin-top:10px"><button class="btn btn-primary" id="open-org" style="flex:1">🗂️ 開啟照片分類器</button></div>
+</div>
+
+<p class="muted small" style="text-align:center">短片工房 v3.3・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
+
+<div id="org-view">
+<div class="org-inner">
+<div class="row" style="justify-content:space-between"><button class="btn" id="org-back">← 回短片工房</button><b>🗂️ 照片分類器</b><button class="btn" id="org-undo" disabled>↩ 復原</button></div>
+<h2 style="margin:12px 0 2px;font-size:19px">正在整理我的 <span class="org-folder-name" id="org-folder-name">未選擇</span> 資料夾</h2>
+<div class="org-stats">
+<span>檔案總數 <b id="org-st-total">0</b></span>
+<span>照片 <b id="org-st-photo">0</b></span>
+<span>影片 <b id="org-st-video">0</b></span>
+<span>重複檔案 <b id="org-st-dup">0</b></span>
+</div>
+<div class="row">
+<button class="btn btn-primary" id="org-pick">📁 選擇資料夾</button>
+<button class="btn" id="org-demo">✨ 示範</button>
+<button class="btn" id="org-replay" disabled>🔁 重播</button>
+<button class="btn" id="org-sort" disabled>🌀 分類</button>
+<span class="muted small">（電腦可按空白鍵開始分類）</span>
+</div>
+<input type="file" id="org-file" multiple accept="image/*,video/*,*/*" style="display:none">
+<p class="muted small" id="org-status" style="min-height:18px">先選一個資料夾，或按「示範」看看效果。</p>
+<div class="org-cols">
+<div><div class="org-col-h">📷 照片</div><div id="org-cards-photo"></div></div>
+<div class="org-stage" id="org-stage"><div id="org-tilt"><div id="org-pile"></div></div></div>
+<div><div class="org-col-h">🎬 影片與清理</div><div id="org-cards-video"></div></div>
+</div>
+<div id="org-confirm">
+<b id="org-confirm-text">要整理 0 個檔案嗎？</b>
+<div class="row" style="margin-top:8px"><button class="btn btn-primary" id="org-move">📦 移動</button><button class="btn" id="org-copy">📄 複製</button><button class="btn" id="org-skip">先不要</button></div>
+<p class="muted small" style="margin:8px 0 0">檔案會放進以分類命名的子資料夾；絕不刪除原始檔（移動＝搬過去）、絕不覆寫同名檔（自動加編號）。按右上角「復原」可全部搬回來。</p>
+</div>
+</div>
+</div>
+<div id="org-fly"></div>
 
 <div id="modal-back"><div id="modal"></div></div>
 <div id="toast"></div>
@@ -452,6 +515,152 @@ $('#clear-caption').addEventListener('click',()=>{$('#caption').value='';try{loc
 
 loadSettings();
 (async()=>{await restoreMusic();const had=await restoreDraft();if(had)toast('已恢復上次的草稿');await importShared();renderVideos();})();
+/* ================= 照片分類器 ================= */
+const ORG_CATS=[
+ {id:'screenshot',name:'螢幕截圖',group:'photo'},
+ {id:'night',name:'夜景與陰鬱氛圍',group:'photo'},
+ {id:'golden',name:'黃金時刻',group:'photo'},
+ {id:'sky',name:'天空與海洋',group:'photo'},
+ {id:'portrait',name:'人像',group:'photo'},
+ {id:'daily',name:'日常生活',group:'photo'},
+ {id:'vshort',name:'短片',sub:'少於 10 秒',group:'video'},
+ {id:'broll',name:'B-roll 素材',sub:'10～60 秒',group:'video'},
+ {id:'vlong',name:'長片',sub:'60 秒以上',group:'video'},
+ {id:'dup',name:'重複檔案',group:'video'},
+ {id:'other',name:'文件與其他檔案',group:'video'}];
+const orgCat=id=>ORG_CATS.find(c=>c.id===id);
+function orgFolderName(id){return orgCat(id).name;}
+function orgVideoCat(sec){if(sec==null||isNaN(sec))return 'broll';if(sec<10)return 'vshort';if(sec<60)return 'broll';return 'vlong';}
+function orgIsScreenshotName(name){return /screenshot|截圖|螢幕/i.test(name||'');}
+function orgPhotoCat(f){if(f.screenshot)return 'screenshot';if(f.brightness<0.30)return 'night';if(f.warm>0.36&&f.brightness>=0.30)return 'golden';if(f.blue>0.33)return 'sky';if(f.skin>0.16)return 'portrait';return 'daily';}
+function orgKindOf(name,type){if((type&&type.indexOf('video')===0)||/\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(name||''))return 'video';if((type&&type.indexOf('image')===0)||/\.(jpe?g|png|gif|webp|heic|bmp|avif)$/i.test(name||''))return 'photo';return 'other';}
+function orgSpiral(i,n,cx,cy,R){const a=i*2.399963;const r=n<=1?0:R*0.92*Math.sqrt(i/Math.max(1,n-1));return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),rot:((i*47)%17)-8};}
+function orgSuffixName(name,k){const d=name.lastIndexOf('.');if(d<=0)return name+' ('+k+')';return name.slice(0,d)+' ('+k+')'+name.slice(d);}
+let orgItems=[],orgDirHandle=null,orgMode=null,orgUndoLog=[],orgFlying=false,orgRot=0,orgRafOn=false,orgArrived={};
+const orgStatus=t=>{$('#org-status').textContent=t;};
+function orgSetStats(){$('#org-st-total').textContent=orgItems.length;$('#org-st-photo').textContent=orgItems.filter(i=>i.kind==='photo').length;$('#org-st-video').textContent=orgItems.filter(i=>i.kind==='video').length;$('#org-st-dup').textContent=orgItems.filter(i=>i.cat==='dup').length;}
+function orgRenderCards(){$('#org-cards-photo').innerHTML=ORG_CATS.filter(c=>c.group==='photo').map(orgCardHTML).join('');$('#org-cards-video').innerHTML=ORG_CATS.filter(c=>c.group==='video').map(orgCardHTML).join('');}
+function orgCardHTML(c){return '<div class="org-card" id="org-card-'+c.id+'">'+esc(c.name)+(c.sub?'<div class="muted" style="font-size:11px">'+esc(c.sub)+'</div>':'')+'<span class="cnt" id="org-cnt-'+c.id+'">0</span></div>';}
+function orgBump(cat){orgArrived[cat]=(orgArrived[cat]||0)+1;const el=$('#org-cnt-'+cat);if(el)el.textContent=orgArrived[cat];const card=$('#org-card-'+cat);if(card){card.classList.remove('pop');void card.offsetWidth;card.classList.add('pop');}}
+
+async function orgHashFile(file){try{const buf=await file.arrayBuffer();const h=await crypto.subtle.digest('SHA-256',buf);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');}catch(_){return null;}}
+function orgImageFeatures(item){return new Promise(res=>{const url=URL.createObjectURL(item.file);const img=new Image();
+ img.onload=()=>{try{const cv=document.createElement('canvas');cv.width=40;cv.height=40;const cx=cv.getContext('2d');cx.drawImage(img,0,0,40,40);const d=cx.getImageData(0,0,40,40).data;let lum=0,blue=0,warm=0,skin=0,white=0;const n=40*40;
+  for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2];lum+=(0.299*r+0.587*g+0.114*b)/255;if(b>r+18&&b>g+8&&b>70)blue++;if(r>110&&r>b+34&&r>=g&&g>b)warm++;if(r>95&&g>40&&b>20&&r>g&&r>b&&(r-g)>15&&(r-g)<110)skin++;if(r>235&&g>235&&b>235)white++;}
+  URL.revokeObjectURL(url);res({brightness:lum/n,blue:blue/n,warm:warm/n,skin:skin/n,screenshot:orgIsScreenshotName(item.name)||white/n>0.6});}catch(_){URL.revokeObjectURL(url);res({brightness:.5,blue:0,warm:0,skin:0,screenshot:orgIsScreenshotName(item.name)});}};
+ img.onerror=()=>{URL.revokeObjectURL(url);res({brightness:.5,blue:0,warm:0,skin:0,screenshot:orgIsScreenshotName(item.name)});};img.src=url;});}
+
+async function orgAnalyze(){const seen={};let i=0;
+ for(const it of orgItems){i++;orgStatus('分析中… '+i+' / '+orgItems.length+'（'+it.name+'）');
+  if(!it.file&&it.handle){try{it.file=await it.handle.getFile();}catch(_){}}
+  it.hash=it.file?await orgHashFile(it.file):null;
+  if(it.hash&&seen[it.hash]){it.cat='dup';continue;}
+  if(it.hash)seen[it.hash]=1;
+  if(it.kind==='photo'&&it.file){it.cat=orgPhotoCat(await orgImageFeatures(it));}
+  else if(it.kind==='video'){let dur=it.presetDuration;if(dur==null&&it.file){try{dur=await probeVideoDur(it.file);}catch(_){}}it.dur=dur;it.cat=orgVideoCat(dur);}
+  else{it.cat='other';}}
+ orgSetStats();orgRenderPile();$('#org-sort').disabled=false;$('#org-replay').disabled=false;
+ orgStatus('分析完成：共 '+orgItems.length+' 個檔案。按「分類」（或空白鍵）看它們飛進分類卡片。');}
+
+function orgThumbInner(it){if(it.kind==='photo'&&it.file)return '<img src="'+URL.createObjectURL(it.file)+'" alt="">';if(it.kind==='video'&&it.file&&it.presetDuration!=null)return '<img src="'+URL.createObjectURL(it.file)+'" alt="">';if(it.kind==='video'&&it.file)return '<video src="'+URL.createObjectURL(it.file)+'" muted playsinline preload="metadata"></video>';return '<div class="tile">'+(it.kind==='video'?'🎬':'📄')+'</div>';}
+function orgRenderPile(){const pile=$('#org-pile');pile.innerHTML='';orgArrived={};ORG_CATS.forEach(c=>{const e=$('#org-cnt-'+c.id);if(e)e.textContent='0';});
+ const stage=$('#org-stage');const W=stage.clientWidth,H=stage.clientHeight;const R=Math.min(W,H)/2-46;
+ orgItems.forEach((it,i)=>{const p=orgSpiral(i,orgItems.length,W/2,H/2,Math.max(60,R));it.home=p;
+  const d=document.createElement('div');d.className='org-thumb';d.id='org-thumb-'+it.id;
+  d.style.left=(p.x-32)+'px';d.style.top=(p.y-38)+'px';d.style.transform='rotate('+p.rot+'deg)';d.style.zIndex=3+i;
+  d.innerHTML=orgThumbInner(it)+'<div class="cap">'+esc(it.name)+'</div>';pile.appendChild(d);it.el=d;});}
+function orgSpin(){if(!orgRafOn)return;if(!orgFlying){orgRot=(orgRot+0.045)%360;const p=$('#org-pile');if(p)p.style.transform='rotate('+orgRot+'deg)';}requestAnimationFrame(orgSpin);}
+
+function orgBezier(a,c,b,t){const u=1-t;return {x:u*u*a.x+2*u*t*c.x+t*t*b.x,y:u*u*a.y+2*u*t*c.y+t*t*b.y};}
+function orgSort(){if(orgFlying||!orgItems.length)return;orgFlying=true;$('#org-sort').disabled=true;orgStatus('分類中…');
+ orgItems.forEach(it=>{const el=it.el;if(!el)return;const r=el.getBoundingClientRect();it.fx={x:r.left,y:r.top,w:r.width,h:r.height,rot:it.home?it.home.rot:0};
+  el.style.position='fixed';el.style.left=r.left+'px';el.style.top=r.top+'px';el.style.margin='0';el.style.zIndex=90;$('#org-fly').appendChild(el);});
+ const n=orgItems.length;const T=Math.max(3000,Math.min(6800,2400+n*170));const FLY=680;const t0=performance.now();
+ const targets=orgItems.map(it=>{const card=$('#org-card-'+it.cat);const r=card?card.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0};return {x:r.left+r.width/2,y:r.top+r.height/2};});
+ function frame(now){const el=now-t0;let doneAll=true;
+  orgItems.forEach((it,i)=>{const elx=it.el;if(!elx||it.landed)return;const start=T>FLY?(T-FLY)*Math.pow(i/Math.max(1,n),1.6):0;const lt=(el-start)/FLY;
+   if(lt<0){doneAll=false;return;}
+   if(lt>=1){it.landed=true;elx.style.display='none';orgBump(it.cat);return;}
+   doneAll=false;const e=lt<.5?2*lt*lt:1-Math.pow(-2*lt+2,2)/2;
+   const s={x:it.fx.x+it.fx.w/2,y:it.fx.y+it.fx.h/2};const tg=targets[i];const ctrl={x:(s.x+tg.x)/2,y:Math.min(s.y,tg.y)-130};
+   const p=orgBezier(s,ctrl,tg,e);const sc=1-0.72*e;
+   elx.style.transform='translate('+(p.x-s.x)+'px,'+(p.y-s.y)+'px) rotate('+it.fx.rot+'deg) scale('+sc+')';});
+  if(!doneAll&&orgFlying){requestAnimationFrame(frame);}else{orgFlying=false;$('#org-sort').disabled=false;orgFinishSort();}}
+ requestAnimationFrame(frame);}
+function orgFinishSort(){orgStatus('分類完成！');
+ if(orgMode==='folder'&&orgDirHandle){$('#org-confirm-text').textContent='要整理 '+orgItems.length+' 個檔案嗎？';$('#org-confirm').classList.add('open');}
+ else if(orgMode==='picked'){orgStatus('分類完成！（手機選檔模式只能預覽分類；要真的移動檔案，請在電腦 Chrome 用「選擇資料夾」。）');}
+ else if(orgMode==='demo'){orgStatus('示範結束。按「重播」再看一次，或選一個真的資料夾試試。');}}
+
+function orgResetData(){orgItems=[];orgArrived={};$('#org-pile').innerHTML='';$('#org-fly').innerHTML='';$('#org-confirm').classList.remove('open');orgSetStats();}
+async function orgPick(){if(window.showDirectoryPicker){try{const dh=await showDirectoryPicker({mode:'readwrite'});orgDirHandle=dh;orgMode='folder';$('#org-folder-name').textContent=dh.name;orgResetData();
+   for await(const h of dh.values()){if(h.kind==='file'){orgItems.push({id:'o'+orgItems.length+'_'+Math.random().toString(36).slice(2,6),name:h.name,handle:h,file:null,kind:orgKindOf(h.name,'')});}}
+   if(!orgItems.length){orgStatus('這個資料夾第一層沒有檔案。');return;}
+   orgStatus('讀到 '+orgItems.length+' 個檔案，分析中…');await orgAnalyze();
+  }catch(e){if(e&&e.name!=='AbortError')orgStatus('開資料夾失敗：'+e.message);}}
+ else{$('#org-file').click();}}
+async function orgPickedFiles(files){orgDirHandle=null;orgMode='picked';$('#org-folder-name').textContent='選取的檔案';orgResetData();
+ for(const f of files){orgItems.push({id:'o'+orgItems.length+'_'+Math.random().toString(36).slice(2,6),name:f.name,handle:null,file:f,kind:orgKindOf(f.name,f.type)});}
+ if(!orgItems.length)return;await orgAnalyze();}
+
+function orgDemoBlob(draw,w,h){return new Promise(res=>{const cv=document.createElement('canvas');cv.width=w||240;cv.height=h||300;draw(cv.getContext('2d'),cv.width,cv.height);cv.toBlob(b=>res(b),'image/jpeg',.85);});}
+function orgGrad(x,w,h,cols){const g=x.createLinearGradient(0,0,0,h);cols.forEach((c,i)=>g.addColorStop(i/(cols.length-1),c));x.fillStyle=g;x.fillRect(0,0,w,h);}
+async function orgDemo(){orgDirHandle=null;orgMode='demo';$('#org-folder-name').textContent='我的示範相簿';orgResetData();orgStatus('準備示範檔案…');
+ const P=[];const add=(name,draw,kind,dur)=>{P.push(orgDemoBlob(draw).then(blob=>({name,blob,kind,dur})));};
+ add('IMG_2041.jpg',(x,w,h)=>{orgGrad(x,w,h,['#0b1026','#1b2a4a','#31456e']);x.fillStyle='#e8e6df';x.beginPath();x.arc(w*.74,h*.24,20,0,7);x.fill();x.fillStyle='#fff';for(let i=0;i<40;i++){x.fillRect((i*67)%w,(i*41)%Math.round(h*.7),2,2);}},'photo');
+ add('IMG_2042.jpg',(x,w,h)=>{orgGrad(x,w,h,['#3b2f63','#b84a39','#f59e0b','#fcd34d']);x.fillStyle='#fff7cc';x.beginPath();x.arc(w*.5,h*.68,26,0,7);x.fill();},'photo');
+ let skyBlob=null;
+ add('IMG_2043.jpg',(x,w,h)=>{orgGrad(x,w,h,['#bae6fd','#7dd3fc','#38bdf8','#0369a1']);x.fillStyle='rgba(255,255,255,.75)';x.fillRect(0,h*.55,w,4);},'photo');
+ add('IMG_2044.jpg',(x,w,h)=>{x.fillStyle='#f3e2cf';x.fillRect(0,0,w,h);x.fillStyle='#8a5a33';x.beginPath();x.arc(w/2,h*.42,52,Math.PI,0);x.fill();x.fillStyle='#eec39b';x.beginPath();x.arc(w/2,h*.46,44,0,7);x.fill();x.fillStyle='#374151';x.beginPath();x.arc(w/2-15,h*.44,4,0,7);x.arc(w/2+15,h*.44,4,0,7);x.fill();},'photo');
+ add('IMG_2045.jpg',(x,w,h)=>{orgGrad(x,w,h,['#fef3c7','#fde68a','#a7f3d0']);x.fillStyle='#b45309';x.fillRect(w*.18,h*.55,w*.64,h*.3);x.fillStyle='#065f46';x.fillRect(w*.3,h*.4,w*.4,h*.15);},'photo');
+ add('Screenshot_20261107.png',(x,w,h)=>{x.fillStyle='#ffffff';x.fillRect(0,0,w,h);x.fillStyle='#e5e7eb';for(let i=0;i<6;i++)x.fillRect(18,30+i*38,w-36,20);x.fillStyle='#2563eb';x.fillRect(18,h-56,w-36,34);},'photo');
+ add('IMG_2046.jpg',(x,w,h)=>{orgGrad(x,w,h,['#d1d5db','#9ca3af','#4b5563']);x.fillStyle='#065f46';x.fillRect(0,h*.62,w,h*.38);},'photo');
+ add('IMG_2047.jpg',(x,w,h)=>{orgGrad(x,w,h,['#111827','#1f2937','#374151']);x.fillStyle='#fbbf24';x.fillRect(w*.2,h*.6,8,26);x.fillRect(w*.7,h*.55,8,30);},'photo');
+ add('海邊空拍.mp4',(x,w,h)=>{orgGrad(x,w,h,['#a5f3fc','#22d3ee','#0e7490']);x.fillStyle='rgba(255,255,255,.85)';x.beginPath();x.arc(w/2,h/2,30,0,7);x.fill();x.fillStyle='#0e7490';x.beginPath();x.moveTo(w/2-11,h/2-16);x.lineTo(w/2-11,h/2+16);x.lineTo(w/2+18,h/2);x.fill();},'video',6);
+ add('山路B-roll.mp4',(x,w,h)=>{orgGrad(x,w,h,['#d9f99d','#65a30d','#365314']);x.fillStyle='#f8fafc';x.beginPath();x.arc(w/2,h/2,30,0,7);x.fill();x.fillStyle='#365314';x.beginPath();x.moveTo(w/2-11,h/2-16);x.lineTo(w/2-11,h/2+16);x.lineTo(w/2+18,h/2);x.fill();},'video',35);
+ add('演唱會全程.mp4',(x,w,h)=>{orgGrad(x,w,h,['#1e1b4b','#4c1d95','#831843']);x.fillStyle='#fbbf24';for(let i=0;i<8;i++)x.fillRect(20+i*26,h*.3,4,4);x.fillStyle='rgba(255,255,255,.9)';x.beginPath();x.arc(w/2,h/2,30,0,7);x.fill();x.fillStyle='#4c1d95';x.beginPath();x.moveTo(w/2-11,h/2-16);x.lineTo(w/2-11,h/2+16);x.lineTo(w/2+18,h/2);x.fill();},'video',150);
+ add('健行筆記.pdf',(x,w,h)=>{x.fillStyle='#fffdf5';x.fillRect(0,0,w,h);x.fillStyle='#374151';for(let i=0;i<9;i++)x.fillRect(22,26+i*26,w-44-(i%3)*30,9);x.fillStyle='#b91c1c';x.fillRect(w-58,h-58,34,34);},'other');
+ const made=await Promise.all(P);
+ skyBlob=made[2].blob;
+ made.push({name:'IMG_2043-副本.jpg',blob:skyBlob,kind:'photo',dur:null});
+ const order=[0,1,2,3,4,5,6,7,12,8,9,10,11];
+ for(const ix of order){const d=made[ix];const f=new File([d.blob],d.name,{type:d.kind==='photo'?'image/jpeg':d.kind==='video'?'video/mp4':'application/pdf'});
+  orgItems.push({id:'o'+orgItems.length+'_'+Math.random().toString(36).slice(2,6),name:d.name,handle:null,file:f,kind:d.kind,presetDuration:d.dur||null});}
+ await orgAnalyze();}
+
+async function orgWriteFile(dir,name,data){const fh=await dir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(data);await w.close();}
+async function orgUniqueName(dir,name){let cand=name,k=2;while(true){try{await dir.getFileHandle(cand);cand=orgSuffixName(name,k++);}catch(_){return cand;}}}
+async function orgOrganize(action){if(!orgDirHandle)return;$('#org-confirm').classList.remove('open');let okN=0,failN=0;orgStatus('整理中…');
+ for(const it of orgItems){try{const sub=await orgDirHandle.getDirectoryHandle(orgFolderName(it.cat),{create:true});
+   const finalName=await orgUniqueName(sub,it.name);
+   const src=it.handle?await it.handle.getFile():it.file;if(!src)throw new Error('no source');
+   await orgWriteFile(sub,finalName,await src.arrayBuffer());
+   if(action==='move'&&it.handle){await orgDirHandle.removeEntry(it.name);}
+   orgUndoLog.push({action,name:it.name,folder:orgFolderName(it.cat),finalName});okN++;
+  }catch(_){failN++;}orgStatus('整理中… 成功 '+okN+(failN?'，失敗 '+failN:''));}
+ orgStatus('整理完成：成功 '+okN+' 個'+(failN?'，失敗 '+failN+' 個':'')+'。');orgRefreshUndo();toast('整理完成 '+okN+' 個檔案');}
+async function orgUndoAll(){if(!orgDirHandle||!orgUndoLog.length)return;let n=0;
+ for(const op of orgUndoLog.slice().reverse()){try{const sub=await orgDirHandle.getDirectoryHandle(op.folder);const fh=await sub.getFileHandle(op.finalName);const f=await fh.getFile();
+   if(op.action==='move'){const back=await orgUniqueName(orgDirHandle,op.name);await orgWriteFile(orgDirHandle,back,await f.arrayBuffer());}
+   await sub.removeEntry(op.finalName);n++;}catch(_){}}
+ orgUndoLog=[];orgRefreshUndo();orgStatus('已復原 '+n+' 個檔案。');toast('已復原 '+n+' 個檔案');}
+function orgRefreshUndo(){$('#org-undo').disabled=!orgUndoLog.length;}
+
+function orgOpen(){$('#org-view').classList.add('open');orgRenderCards();orgSetStats();if(!orgRafOn){orgRafOn=true;requestAnimationFrame(orgSpin);}if(orgItems.length)setTimeout(orgRenderPile,60);}
+function orgClose(){$('#org-view').classList.remove('open');orgRafOn=false;}
+$('#open-org').addEventListener('click',orgOpen);
+$('#org-back').addEventListener('click',orgClose);
+$('#org-pick').addEventListener('click',orgPick);
+$('#org-demo').addEventListener('click',()=>{orgDemo().catch(e=>orgStatus('示範失敗：'+e.message));});
+$('#org-file').addEventListener('change',e=>{if(e.target.files.length)orgPickedFiles(e.target.files);e.target.value='';});
+$('#org-sort').addEventListener('click',orgSort);
+$('#org-replay').addEventListener('click',()=>{if(orgFlying)return;orgItems.forEach(it=>it.landed=false);orgRenderPile();setTimeout(orgSort,350);});
+$('#org-move').addEventListener('click',()=>orgOrganize('move'));
+$('#org-copy').addEventListener('click',()=>orgOrganize('copy'));
+$('#org-skip').addEventListener('click',()=>$('#org-confirm').classList.remove('open'));
+$('#org-undo').addEventListener('click',orgUndoAll);
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&$('#org-view').classList.contains('open')){const t=document.activeElement;if(t&&/INPUT|TEXTAREA|SELECT/.test(t.tagName))return;e.preventDefault();orgSort();}});
+
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
 </script>
 </body>
