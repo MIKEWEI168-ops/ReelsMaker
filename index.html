@@ -63,6 +63,17 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 .org-thumb .tile{width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-size:25px;background:#eef2f2}
 .org-thumb .cap{font-size:9px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;text-align:center}
 #org-fly{position:fixed;inset:0;pointer-events:none;z-index:80}
+#org-sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:95}
+#org-sheet.open{display:block}
+#org-sheet-panel{position:absolute;left:0;right:0;bottom:0;max-height:84%;overflow-y:auto;background:#f9fafb;border-radius:16px 16px 0 0;padding:14px;max-width:1020px;margin:0 auto}
+#org-sheet-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+@media (min-width:720px){#org-sheet-grid{grid-template-columns:repeat(5,1fr)}}
+.org-cell{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:5px}
+.org-cell img,.org-cell video{width:100%;height:92px;object-fit:cover;display:block;border-radius:4px;background:#111}
+.org-cell .tile{height:92px;display:flex;align-items:center;justify-content:center;font-size:34px;background:#eef2f2;border-radius:4px}
+.org-cell .nm{font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org-cell .mt{font-size:11px;color:#6b7280}
+.org-card{cursor:pointer}
 #org-confirm{display:none;background:#fff7e6;border:1px solid #f2c14e;border-radius:12px;padding:12px;margin-top:10px}
 #org-confirm.open{display:block}
 .org-bybtn.on{background:#0d9488;color:#fff;border-color:#0d9488}
@@ -150,7 +161,7 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <div class="row" style="margin-top:10px"><button class="btn btn-primary" id="open-org" style="flex:1">🗂️ 開啟照片分類器</button></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3.4・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<p class="muted small" style="text-align:center">短片工房 v3.6・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
 
 <div id="org-view">
@@ -178,6 +189,11 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <div class="org-stage" id="org-stage"><div id="org-tilt"><div id="org-pile"></div></div></div>
 <div><div class="org-col-h" id="org-colh-right">🎬 影片與清理</div><div id="org-cards-video"></div></div>
 </div>
+<div id="org-sheet"><div id="org-sheet-panel">
+<div class="row" style="justify-content:space-between"><b id="org-sheet-title">分類內容</b><button class="btn" id="org-sheet-close">✕ 關閉</button></div>
+<div class="row" style="margin-top:10px"><button class="btn btn-primary" id="org-sheet-make" style="flex:1">🎬 把這組送去做短片</button></div>
+<div id="org-sheet-grid"></div>
+</div></div>
 <div id="org-confirm">
 <b id="org-confirm-text">要整理 0 個檔案嗎？</b>
 <div class="row" style="margin-top:8px"><button class="btn btn-primary" id="org-move">📦 移動</button><button class="btn" id="org-copy">📄 複製</button><button class="btn" id="org-skip">先不要</button></div>
@@ -540,6 +556,7 @@ function orgKindOf(name,type){if((type&&type.indexOf('video')===0)||/\.(mp4|mov|
 function orgSpiral(i,n,cx,cy,R){const a=i*2.399963;const r=n<=1?0:R*0.92*Math.sqrt(i/Math.max(1,n-1));return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),rot:((i*47)%17)-8};}
 function orgSuffixName(name,k){const d=name.lastIndexOf('.');if(d<=0)return name+' ('+k+')';return name.slice(0,d)+' ('+k+')'+name.slice(d);}
 function orgFmtDate(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
+function orgFmtDur(s){if(s==null||isNaN(s))return '';s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 async function orgExifDate(file){try{const buf=await file.slice(0,262144).arrayBuffer();const v=new DataView(buf);if(buf.byteLength<4||v.getUint16(0)!==0xFFD8)return null;let off=2;
  while(off+4<buf.byteLength){const marker=v.getUint16(off);if(marker===0xFFDA)break;const len=v.getUint16(off+2);
   if(marker===0xFFE1&&v.getUint32(off+4)===0x45786966){const tiff=off+10;const le=v.getUint16(tiff)===0x4949;const g16=o=>v.getUint16(o,le),g32=o=>v.getUint32(o,le);
@@ -563,10 +580,28 @@ function orgRenderCards(){const L=$('#org-cards-photo'),R=$('#org-cards-video');
   const keys=Object.keys(groups).sort((a,b)=>a==='日期未知'?1:b==='日期未知'?-1:b.localeCompare(a));
   const half=Math.ceil(keys.length/2);
   const mk=k=>'<div class="org-card" id="org-card-date-'+k+'">📅 '+esc(k)+'<div class="muted" style="font-size:11px">小相冊・共 '+groups[k]+' 個</div><span class="cnt" id="org-cnt-date-'+k+'">0</span></div>';
-  L.innerHTML=keys.slice(0,half).map(mk).join('')||'<div class="muted small">尚無檔案</div>';R.innerHTML=keys.slice(half).map(mk).join('');return;}
+  L.innerHTML=keys.slice(0,half).map(mk).join('')||'<div class="muted small">尚無檔案</div>';R.innerHTML=keys.slice(half).map(mk).join('');orgBindCards();return;}
  $('#org-colh-left').textContent='📷 照片';$('#org-colh-right').textContent='🎬 影片與清理';
- L.innerHTML=ORG_CATS.filter(c=>c.group==='photo').map(orgCardHTML).join('');R.innerHTML=ORG_CATS.filter(c=>c.group==='video').map(orgCardHTML).join('');}
+ L.innerHTML=ORG_CATS.filter(c=>c.group==='photo').map(orgCardHTML).join('');R.innerHTML=ORG_CATS.filter(c=>c.group==='video').map(orgCardHTML).join('');orgBindCards();}
 function orgItemKey(it){return orgBy==='date'?('date-'+(it.dateKey||'日期未知')):it.cat;}
+let orgSheetKey=null;
+function orgShowGroup(key){orgSheetKey=key;const list=orgItems.filter(it=>orgItemKey(it)===key);
+ $('#org-sheet-title').textContent=orgBy==='date'?('📅 '+key.slice(5)+' 小相冊（'+list.length+' 個）'):(orgCat(key).name+'（'+list.length+' 個）');
+ const np=list.filter(i=>i.kind==='photo').length,nv=list.filter(i=>i.kind==='video').length;const mk=$('#org-sheet-make');
+ if(np+nv>0){mk.style.display='';mk.textContent='🎬 把這組送去做短片（照片 '+np+(nv?'・影片 '+nv:'')+'）';}else{mk.style.display='none';}
+ $('#org-sheet-grid').innerHTML=list.length?list.map(it=>{let media;
+   if(it.kind==='photo'&&it.file)media='<img src="'+URL.createObjectURL(it.file)+'" alt="">';
+   else if(it.kind==='video'&&it.file&&it.presetDuration!=null)media='<img src="'+URL.createObjectURL(it.file)+'" alt="">';
+   else if(it.kind==='video'&&it.file)media='<video src="'+URL.createObjectURL(it.file)+'" muted playsinline preload="metadata"></video>';
+   else media='<div class="tile">'+(it.kind==='video'?'🎬':'📄')+'</div>';
+   const meta=[];if(it.kind==='video'&&it.dur!=null)meta.push('▶ '+orgFmtDur(it.dur));if(orgBy==='date')meta.push(orgCat(it.cat).name);else if(it.dateKey)meta.push('📅 '+it.dateKey);
+   return '<div class="org-cell">'+media+'<div class="nm">'+esc(it.name)+'</div>'+(meta.length?'<div class="mt">'+esc(meta.join('・'))+'</div>':'')+'</div>';}).join(''):'<div class="muted">這個分類目前沒有檔案。</div>';
+ $('#org-sheet').classList.add('open');}
+function orgBindCards(){document.querySelectorAll('.org-card').forEach(c=>{c.onclick=()=>orgShowGroup(c.id.replace('org-card-',''));});}
+async function orgSendToMaker(){if(!orgSheetKey)return;const list=orgItems.filter(it=>orgItemKey(it)===orgSheetKey&&it.file&&(it.kind==='photo'||it.kind==='video'));if(!list.length){toast('這組沒有照片或影片');return;}
+ let n=0;for(const it of list){if(it.kind==='video'){const vd=it.dur!=null?it.dur:await probeVideoDur(it.file);photos.push({file:it.file,url:URL.createObjectURL(it.file),cap:'',dur:null,draftBlob:null,kind:'video',videoDur:vd});}
+  else{photos.push({file:it.file,url:URL.createObjectURL(it.file),cap:'',dur:null,draftBlob:null,kind:'photo'});}n++;}
+ renderThumbs();saveDraft();$('#org-sheet').classList.remove('open');orgClose();window.scrollTo({top:0,behavior:'smooth'});toast('已送 '+n+' 個到短片工房，在「1️⃣ 照片／影片」那區，往下就能生成');}
 function orgSetBy(m){if(orgBy===m||orgFlying)return;orgBy=m;document.querySelectorAll('.org-bybtn').forEach(b=>b.classList.remove('on'));$('#org-by-'+m).classList.add('on');orgRenderCards();if(orgItems.length){orgItems.forEach(it=>it.landed=false);orgRenderPile();}orgStatus(m==='date'?'依日期分類：每一天是一個小相冊（照片優先讀 EXIF 拍攝日期，否則用檔案日期）。':'依分類：內容類別分組。');}
 function orgCardHTML(c){return '<div class="org-card" id="org-card-'+c.id+'">'+esc(c.name)+(c.sub?'<div class="muted" style="font-size:11px">'+esc(c.sub)+'</div>':'')+'<span class="cnt" id="org-cnt-'+c.id+'">0</span></div>';}
 function orgBump(cat){orgArrived[cat]=(orgArrived[cat]||0)+1;const el=$('#org-cnt-'+cat);if(el)el.textContent=orgArrived[cat];const card=$('#org-card-'+cat);if(card){card.classList.remove('pop');void card.offsetWidth;card.classList.add('pop');}}
@@ -617,9 +652,9 @@ function orgSort(){if(orgFlying||!orgItems.length)return;orgFlying=true;$('#org-
   if(!doneAll&&orgFlying){requestAnimationFrame(frame);}else{orgFlying=false;$('#org-sort').disabled=false;orgFinishSort();}}
  requestAnimationFrame(frame);}
 function orgFinishSort(){orgStatus('分類完成！');
- if(orgMode==='folder'&&orgDirHandle){$('#org-confirm-text').textContent='要整理 '+orgItems.length+' 個檔案嗎？';$('#org-confirm').classList.add('open');}
- else if(orgMode==='picked'){orgStatus('分類完成！（手機選檔模式只能預覽分類；要真的移動檔案，請在電腦 Chrome 用「選擇資料夾」。）');}
- else if(orgMode==='demo'){orgStatus('示範結束。按「重播」再看一次，或選一個真的資料夾試試。');}}
+ if(orgMode==='folder'&&orgDirHandle){$('#org-confirm-text').textContent='要整理 '+orgItems.length+' 個檔案嗎？';$('#org-confirm').classList.add('open');orgStatus('分類完成！點任一張分類卡，就能看裡面有哪些檔案。');}
+ else if(orgMode==='picked'){orgStatus('分類完成！點任一張分類卡，就能看裡面有哪些檔案。（手機選檔模式只能預覽；要真的移動檔案，請在電腦 Chrome 用「選擇資料夾」。）');}
+ else if(orgMode==='demo'){orgStatus('示範結束。點任一張分類卡可以看裡面的檔案；按「重播」再看一次動畫。');}}
 
 function orgResetData(){orgItems=[];orgArrived={};$('#org-pile').innerHTML='';$('#org-fly').innerHTML='';$('#org-confirm').classList.remove('open');orgSetStats();}
 async function orgPick(){if(window.showDirectoryPicker){try{const dh=await showDirectoryPicker({mode:'readwrite'});orgDirHandle=dh;orgMode='folder';$('#org-folder-name').textContent=dh.name;orgResetData();
@@ -682,6 +717,9 @@ $('#open-org').addEventListener('click',orgOpen);
 $('#open-org2').addEventListener('click',orgOpen);
 $('#org-by-cat').addEventListener('click',()=>orgSetBy('cat'));
 $('#org-by-date').addEventListener('click',()=>orgSetBy('date'));
+$('#org-sheet-close').addEventListener('click',()=>$('#org-sheet').classList.remove('open'));
+$('#org-sheet-make').addEventListener('click',orgSendToMaker);
+$('#org-sheet').addEventListener('click',e=>{if(e.target.id==='org-sheet')$('#org-sheet').classList.remove('open');});
 $('#org-back').addEventListener('click',orgClose);
 $('#org-pick').addEventListener('click',orgPick);
 $('#org-demo').addEventListener('click',()=>{orgDemo().catch(e=>orgStatus('示範失敗：'+e.message));});
