@@ -161,7 +161,7 @@ label{display:block;margin:8px 0 4px;font-size:14px;font-weight:600}
 <div class="row" style="margin-top:10px"><button class="btn btn-primary" id="open-org" style="flex:1">🗂️ 開啟照片分類器</button></div>
 </div>
 
-<p class="muted small" style="text-align:center">短片工房 v3.6・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
+<p class="muted small" style="text-align:center">短片工房 v3.7・照片和影片只在你的手機裡處理，不會上傳到任何地方</p>
 </main>
 
 <div id="org-view">
@@ -703,15 +703,29 @@ async function orgOrganize(action){if(!orgDirHandle)return;$('#org-confirm').cla
    if(action==='move'&&it.handle){await orgDirHandle.removeEntry(it.name);}
    orgUndoLog.push({action,name:it.name,folder,finalName});okN++;
   }catch(_){failN++;}orgStatus('整理中… 成功 '+okN+(failN?'，失敗 '+failN:''));}
- orgStatus('整理完成：成功 '+okN+' 個'+(failN?'，失敗 '+failN+' 個':'')+'。');orgRefreshUndo();toast('整理完成 '+okN+' 個檔案');}
-async function orgUndoAll(){if(!orgDirHandle||!orgUndoLog.length)return;let n=0;
- for(const op of orgUndoLog.slice().reverse()){try{const sub=await orgDirHandle.getDirectoryHandle(op.folder);const fh=await sub.getFileHandle(op.finalName);const f=await fh.getFile();
-   if(op.action==='move'){const back=await orgUniqueName(orgDirHandle,op.name);await orgWriteFile(orgDirHandle,back,await f.arrayBuffer());}
+ orgSaveUndo();orgStatus('整理完成：成功 '+okN+' 個'+(failN?'，失敗 '+failN+' 個':'')+'。');orgRefreshUndo();toast('整理完成 '+okN+' 個檔案');}
+let orgSavedHandle=null,orgLogRoot='';
+function orgIDB(){return new Promise((res,rej)=>{const r=indexedDB.open('reelmaker-org',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function orgIDBSet(k,v){try{const db=await orgIDB();db.transaction('kv','readwrite').objectStore('kv').put(v,k);}catch(_){}}
+async function orgIDBGet(k){try{const db=await orgIDB();return await new Promise(res=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);});}catch(_){return null;}}
+function orgSaveUndo(){try{if(orgUndoLog.length){localStorage.setItem('rm_org_undo',JSON.stringify({root:orgDirHandle?orgDirHandle.name:orgLogRoot,ops:orgUndoLog}));if(orgDirHandle)orgIDBSet('dirHandle',orgDirHandle);}else{localStorage.removeItem('rm_org_undo');}}catch(_){}}
+function orgLoadUndo(){try{const s=localStorage.getItem('rm_org_undo');if(s){const j=JSON.parse(s);if(j&&j.ops&&j.ops.length){orgUndoLog=j.ops;orgLogRoot=j.root||'';}}}catch(_){}
+ orgIDBGet('dirHandle').then(h=>{if(h)orgSavedHandle=h;orgRefreshUndo();});orgRefreshUndo();}
+async function orgEnsureRoot(){if(orgDirHandle)return orgDirHandle;
+ if(orgSavedHandle){try{let p=await orgSavedHandle.queryPermission({mode:'readwrite'});if(p!=='granted')p=await orgSavedHandle.requestPermission({mode:'readwrite'});if(p==='granted'){orgDirHandle=orgSavedHandle;return orgDirHandle;}}catch(_){}}
+ return null;}
+async function orgUndoAll(){if(!orgUndoLog.length)return;const root=await orgEnsureRoot();
+ if(!root){toast('請先按「選擇資料夾」，選回原本的資料夾'+(orgLogRoot?'「'+orgLogRoot+'」':''));return;}
+ if(orgLogRoot&&root.name!==orgLogRoot){toast('這是資料夾「'+orgLogRoot+'」的復原紀錄，請先選回那個資料夾');return;}
+ let n=0;
+ for(const op of orgUndoLog.slice().reverse()){try{const sub=await root.getDirectoryHandle(op.folder);const fh=await sub.getFileHandle(op.finalName);const f=await fh.getFile();
+   if(op.action==='move'){const back=await orgUniqueName(root,op.name);await orgWriteFile(root,back,await f.arrayBuffer());}
    await sub.removeEntry(op.finalName);n++;}catch(_){}}
- orgUndoLog=[];orgRefreshUndo();orgStatus('已復原 '+n+' 個檔案。');toast('已復原 '+n+' 個檔案');}
+ orgUndoLog=[];orgSaveUndo();orgRefreshUndo();orgStatus('已復原 '+n+' 個檔案。');toast('已復原 '+n+' 個檔案');}
 function orgRefreshUndo(){$('#org-undo').disabled=!orgUndoLog.length;}
 
-function orgOpen(){$('#org-view').classList.add('open');orgRenderCards();orgSetStats();if(!orgRafOn){orgRafOn=true;requestAnimationFrame(orgSpin);}if(orgItems.length)setTimeout(orgRenderPile,60);}
+function orgOpen(){$('#org-view').classList.add('open');orgLoadUndo();orgRenderCards();orgSetStats();if(!orgRafOn){orgRafOn=true;requestAnimationFrame(orgSpin);}if(orgItems.length)setTimeout(orgRenderPile,60);
+ if(orgUndoLog.length&&!orgItems.length)orgStatus('有 '+orgUndoLog.length+' 個檔案的整理紀錄可以復原'+(orgLogRoot?'（資料夾「'+orgLogRoot+'」）':'')+'，按右上角「↩ 復原」即可。');}
 function orgClose(){$('#org-view').classList.remove('open');orgRafOn=false;}
 $('#open-org').addEventListener('click',orgOpen);
 $('#open-org2').addEventListener('click',orgOpen);
